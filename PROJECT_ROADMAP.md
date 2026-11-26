@@ -8,11 +8,10 @@
 - FastAPI, Streamlit, SQLite
 - evaluation + tests
 
-## Phase 2 — Capstone models
-- implement loading of existing Phi-3 CPT/SFT adapter
-- load Sentence-BERT all-MiniLM-L6-v2
-- build FAISS semantic index over approved chunks
-- preserve original evaluation split and rerun metrics after any safety change
+## Phase 2 — Capstone models (integration code added; runtime validation pending)
+- load existing Phi-3 SFT adapter with 4-bit inference
+- load Sentence-BERT all-MiniLM-L6-v2 and validated private FAISS index
+- run GPU smoke tests, preserve the historical evaluation and evaluate changed system on independent questions
 
 ## Phase 3 — Reliability upgrades
 - BM25 + FAISS hybrid retrieval

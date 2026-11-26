@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     generation_backend: str = "extractive"
     model_name: str = "microsoft/Phi-3-mini-4k-instruct"
     model_adapter_path: str = ""
+    faiss_index_path: Path = Path("artifacts/index/guidelines.faiss")
+    faiss_metadata_path: Path = Path("artifacts/index/metadata.json")
+    faiss_build_info_path: Path = Path("artifacts/index/build_info.json")
+    guideline_chunks_path: Path = Path("data/knowledge_base/guideline_chunks.jsonl")
+    embedding_device: str = "cpu"
     embedding_backend: str = "tfidf"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     rerank_backend: str = "heuristic"

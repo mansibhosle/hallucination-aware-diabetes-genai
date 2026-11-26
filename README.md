@@ -32,7 +32,7 @@ flowchart TD
 
 - Approved-source registry, local text ingestion, cleaning, chunking, quality checks and knowledge-base fingerprints.
 - CPU-friendly retrieval combining TF-IDF cosine similarity and exact-term overlap; optional cross-encoder reranking.
-- Extractive evidence-grounded demo generator; optional Hugging Face base-model text generation.
+- Extractive demo generation and optional CUDA Phi-3 PEFT adapter inference; optional original normalized Sentence-BERT/FAISS index loading.
 - Rule-based safety policy, evidence sufficiency gate, lexical claim-support checks, heuristic weighted confidence and risk-specific thresholds.
 - FastAPI service, Streamlit user interface and operations dashboard, SQLite interaction and feedback persistence.
 - Dataset versioning, local experiment and model registry utilities, refresh-age checks, subgroup evaluation, drift calculation and PHI-pattern redaction utilities.
@@ -87,15 +87,15 @@ The four-question demo checks answer/abstain behavior only. It is not a measure 
 
 The preceding academic capstone investigated domain-adapted Phi-3 Mini, Sentence-BERT/FAISS retrieval over 2,335 diabetes-related chunks, and confidence-based abstention. In that separate experiment, the 78-question held-out test produced 79.49% end-to-end accuracy, 87.50% evidence support, and a reduction in evidence-based hallucination from 19.23% (RAG alone) to 12.50% (full system). Abstention recall was 40%; results were not independently clinically validated.
 
-These historical results are **not results of this repository's lightweight demo**. The original trained adapter, full corpus, vector index and research evaluation files are not included. Integrating those artifacts and evaluating the changed system on an appropriate independent test set is future work.
+These historical results are **not results of this repository's lightweight demo**. The original trained adapter, full corpus, vector index and research evaluation files are not included. An optional integration backend is included; runtime validation with the private artifacts and an independent evaluation of the changed system are still required.
 
 ## Configuration and production roadmap
 
 See .env.example, ARCHITECTURE.md and PROJECT_ROADMAP.md.
 
-The default implementation uses TF-IDF, lexical overlap, extractive generation and heuristic confidence. Actual Sentence-BERT/FAISS integration, trained PEFT adapter loading, NLI verification, learned confidence calibration, full evaluation, authentication, automated source ingestion and managed cloud deployment require additional engineering. Some lifecycle utilities are standalone and not wired into the serving path.
+The default implementation uses TF-IDF, lexical overlap, extractive generation and heuristic confidence. Optional FAISS and PEFT backend code is included. NLI verification, learned confidence calibration, full evaluation, authentication, automated source ingestion and managed cloud deployment require additional engineering. Some lifecycle utilities are standalone and not wired into the serving path.
 
-The optional Transformers generator can load a base model after installing its dependencies; setting an adapter path alone does not load an adapter in this version. The source registry is an example policy, not legal clearance for redistributing every document. Verify individual document licenses before ingestion or redistribution.
+Select the phi3_peft backend explicitly to load the local adapter. See the GPU configuration below. The source registry is an example policy, not legal clearance for redistributing every document. Verify individual document licenses before ingestion or redistribution.
 
 Do not expose this unauthenticated prototype to public traffic or submit real patient data. The SQLite logger stores raw inputs; the PHI utility is not comprehensive or automatically applied to the API.
 
@@ -119,3 +119,24 @@ Do not expose this unauthenticated prototype to public traffic or submit real pa
 | scripts, configs, tests | Bootstrap, configuration and testing |
 
 Generated indexes, runtime databases, local model weights and secrets are excluded from version control.
+
+## Optional GPU capstone mode
+
+Install requirements-gpu.txt on a CUDA-enabled machine. Set the following environment variables to private local artifact paths (do not commit the artifacts):
+
+```dotenv
+GENERATION_BACKEND=phi3_peft
+MODEL_ADAPTER_PATH=/path/to/phi3_diabetes_sft_adapter
+EMBEDDING_BACKEND=faiss
+FAISS_INDEX_PATH=/path/to/guidelines.faiss
+FAISS_METADATA_PATH=/path/to/metadata.json
+FAISS_BUILD_INFO_PATH=/path/to/build_info.json
+GUIDELINE_CHUNKS_PATH=/path/to/guideline_chunks.jsonl
+EMBEDDING_DEVICE=cpu
+TOP_K_CANDIDATES=5
+TOP_K_FINAL=5
+RERANK_BACKEND=heuristic
+DB_PATH=outputs/capstone_smoke.sqlite
+```
+
+Run `python scripts/smoke_capstone.py`. Startup checks all metadata IDs and texts against the original corpus, index dimensions and metric, and compares a sample of reconstructed vectors with newly encoded records. The GPU backend loads the base Phi-3 model in 4-bit NF4 and the supplied final SFT adapter. The original adapter, index and data must be supplied separately. The current lexical claim verifier and risk thresholds differ from the original capstone evaluation; these are heuristic checks, not clinically validated safety controls. GPU smoke tests and full evaluation must be run with the private artifacts; CI tests metadata validation without downloading models.

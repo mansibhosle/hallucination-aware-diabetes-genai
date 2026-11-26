@@ -1,0 +1,8 @@
+-r requirements.txt
+torch
+transformers
+peft
+accelerate
+bitsandbytes
+sentence-transformers
+faiss-cpu

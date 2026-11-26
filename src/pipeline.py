@@ -17,10 +17,18 @@ class Platform:
 
     @classmethod
     def load_default(cls):
-        index=SETTINGS.index_dir/"hybrid.joblib"
-        if not index.exists():
-            raise FileNotFoundError("Index missing. Run: python scripts/bootstrap_demo.py")
-        r=HybridRetriever.load(index)
+        if SETTINGS.embedding_backend == "faiss":
+            from .retrieval.faiss_retriever import FaissRetriever
+            r=FaissRetriever(SETTINGS.faiss_index_path, SETTINGS.faiss_metadata_path,
+                SETTINGS.faiss_build_info_path, SETTINGS.guideline_chunks_path,
+                SETTINGS.embedding_model, SETTINGS.embedding_device)
+        elif SETTINGS.embedding_backend == "tfidf":
+            index=SETTINGS.index_dir/"hybrid.joblib"
+            if not index.exists():
+                raise FileNotFoundError("Index missing. Run: python scripts/bootstrap_demo.py")
+            r=HybridRetriever.load(index)
+        else:
+            raise ValueError("Unknown embedding backend")
         rr=Reranker(SETTINGS.rerank_backend, SETTINGS.rerank_model)
         g=GroundedGenerator(SETTINGS.generation_backend, SETTINGS.model_name, SETTINGS.model_adapter_path)
         return cls(r,rr,g)
@@ -34,7 +42,7 @@ class Platform:
 
         candidates=self.retriever.search(question,self.settings.top_k_candidates)
         evidence=self.reranker.rerank(question,candidates,self.settings.top_k_final)
-        retrieval=max([e.rerank_score or e.score for e in evidence],default=0.0)
+        retrieval=max([max(0.0,min(1.0,e.score)) for e in evidence],default=0.0)
         gate = getattr(self.settings, "tfidf_retrieval_gate", self.settings.retrieval_gate) if getattr(self.settings, "embedding_backend", "tfidf") == "tfidf" else self.settings.retrieval_gate
         availability=1.0 if evidence and retrieval>=gate else 0.0
         if availability==0:
@@ -42,6 +50,9 @@ class Platform:
             log_interaction(self.settings.db_path,payload); return payload
 
         answer=self.generator.generate(question,evidence)
+        if not answer.strip() or answer.strip().lower().startswith(("abstain", "insufficient evidence", "the evidence does not support", "the available evidence does not support", "i cannot", "i can't")):
+            payload={"question":question,"decision":"ABSTAIN_MODEL_REFUSAL","answer":"The model did not provide a supported answer.","reason":"model_refusal_or_empty","confidence":0.0,"risk_class":policy.risk_class,"evidence":[e.model_dump() for e in evidence],"metrics":{"retrieval_quality":retrieval,"evidence_availability":availability},"trace_id":trace_id}
+            log_interaction(self.settings.db_path,payload); return payload
         verification=verify_claim_support(answer,evidence)
         support=verification["support"]
         conf=confidence_score(retrieval,availability,support)
