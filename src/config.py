@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     faiss_build_info_path: Path = Path("artifacts/index/build_info.json")
     guideline_chunks_path: Path = Path("data/knowledge_base/guideline_chunks.jsonl")
     embedding_device: str = "cpu"
+    faiss_search_mode: str = "semantic"
+    rerank_device: str = "cpu"
+    max_new_tokens: int = 160
     embedding_backend: str = "tfidf"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     rerank_backend: str = "heuristic"

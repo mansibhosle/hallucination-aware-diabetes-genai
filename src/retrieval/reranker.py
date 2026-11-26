@@ -1,11 +1,11 @@
 from ..schemas import Evidence
 
 class Reranker:
-    def __init__(self, backend="heuristic", model_name="cross-encoder/ms-marco-MiniLM-L-6-v2"):
+    def __init__(self, backend="heuristic", model_name="cross-encoder/ms-marco-MiniLM-L-6-v2", device="cpu"):
         self.backend=backend; self.model_name=model_name; self.model=None
         if backend=="cross_encoder":
             from sentence_transformers import CrossEncoder
-            self.model=CrossEncoder(model_name)
+            self.model=CrossEncoder(model_name, device=device)
 
     def rerank(self, question: str, evidence: list[Evidence], k: int=5) -> list[Evidence]:
         if not evidence: return []

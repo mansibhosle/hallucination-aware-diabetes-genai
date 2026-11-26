@@ -21,7 +21,7 @@ class Platform:
             from .retrieval.faiss_retriever import FaissRetriever
             r=FaissRetriever(SETTINGS.faiss_index_path, SETTINGS.faiss_metadata_path,
                 SETTINGS.faiss_build_info_path, SETTINGS.guideline_chunks_path,
-                SETTINGS.embedding_model, SETTINGS.embedding_device)
+                SETTINGS.embedding_model, SETTINGS.embedding_device, SETTINGS.faiss_search_mode)
         elif SETTINGS.embedding_backend == "tfidf":
             index=SETTINGS.index_dir/"hybrid.joblib"
             if not index.exists():
@@ -29,8 +29,8 @@ class Platform:
             r=HybridRetriever.load(index)
         else:
             raise ValueError("Unknown embedding backend")
-        rr=Reranker(SETTINGS.rerank_backend, SETTINGS.rerank_model)
-        g=GroundedGenerator(SETTINGS.generation_backend, SETTINGS.model_name, SETTINGS.model_adapter_path)
+        rr=Reranker(SETTINGS.rerank_backend, SETTINGS.rerank_model, SETTINGS.rerank_device)
+        g=GroundedGenerator(SETTINGS.generation_backend, SETTINGS.model_name, SETTINGS.model_adapter_path, SETTINGS.max_new_tokens)
         return cls(r,rr,g)
 
     def answer(self, question:str, user_role:str="patient") -> dict:
@@ -50,6 +50,9 @@ class Platform:
             log_interaction(self.settings.db_path,payload); return payload
 
         answer=self.generator.generate(question,evidence)
+        if answer.startswith("ABSTAIN: Generation reached its token budget"):
+            payload={"question":question,"decision":"ABSTAIN_TRUNCATED_GENERATION","answer":"The model could not complete its response within the generation budget.","reason":"generation_token_limit","confidence":0.0,"risk_class":policy.risk_class,"evidence":[e.model_dump() for e in evidence],"metrics":{"retrieval_quality":retrieval,"evidence_availability":availability},"trace_id":trace_id}
+            log_interaction(self.settings.db_path,payload); return payload
         if not answer.strip() or answer.strip().lower().startswith(("abstain", "insufficient evidence", "the evidence does not support", "the available evidence does not support", "i cannot", "i can't")):
             payload={"question":question,"decision":"ABSTAIN_MODEL_REFUSAL","answer":"The model did not provide a supported answer.","reason":"model_refusal_or_empty","confidence":0.0,"risk_class":policy.risk_class,"evidence":[e.model_dump() for e in evidence],"metrics":{"retrieval_quality":retrieval,"evidence_availability":availability},"trace_id":trace_id}
             log_interaction(self.settings.db_path,payload); return payload

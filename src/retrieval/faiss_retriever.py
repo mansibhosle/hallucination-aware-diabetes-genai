@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from ..schemas import Evidence
+from .lexical import BM25, is_reference_chunk, reciprocal_rank_fusion
 
 def load_records(metadata_path, chunks_path):
     records = json.loads(Path(metadata_path).read_text(encoding="utf-8"))
@@ -21,7 +22,7 @@ def load_records(metadata_path, chunks_path):
     return records
 
 class FaissRetriever:
-    def __init__(self, index_path, metadata_path, build_info_path, chunks_path, embedding_model, device="cpu"):
+    def __init__(self, index_path, metadata_path, build_info_path, chunks_path, embedding_model, device="cpu", search_mode="semantic"):
         import faiss
         from sentence_transformers import SentenceTransformer
 
@@ -42,6 +43,11 @@ class FaissRetriever:
         if self.encoder.get_sentence_embedding_dimension() != self.index.d:
             raise ValueError("Embedding dimensions do not match")
         self.verify_sample_mapping()
+        if search_mode not in {"semantic", "hybrid"}:
+            raise ValueError("Unknown FAISS search mode")
+        self.search_mode=search_mode
+        self.eligible=[not is_reference_chunk(r) for r in self.records] if search_mode=="hybrid" else [True]*len(self.records)
+        self.bm25=BM25([r["text"] for r in self.records]) if search_mode=="hybrid" else None
 
     def verify_sample_mapping(self, sample_size=5):
         import numpy as np
@@ -53,16 +59,28 @@ class FaissRetriever:
                 raise ValueError(f"Sample embedding mismatch at row {i}; check index ordering and build configuration")
 
     def search(self, query, k=20):
+        import numpy as np
         q = self.encoder.encode([query], normalize_embeddings=True, convert_to_numpy=True).astype("float32")
-        scores, ids = self.index.search(q, min(k,self.index.ntotal))
+        if self.bm25 is not None:
+            # This small corpus permits an exact dense score for every record.
+            scores, ids = self.index.search(q, self.index.ntotal)
+            dense_scores = {int(i):float(s) for i,s in zip(ids[0],scores[0]) if i>=0}
+            pool = max(k*2,50)
+            dense = [i for i in dense_scores if self.eligible[i]][:pool]
+            lexical_scores = self.bm25.scores(query)
+            lexical = [int(i) for i in np.argsort(-lexical_scores,kind="stable") if self.eligible[int(i)] and lexical_scores[int(i)]>0][:pool]
+            selected = reciprocal_rank_fusion([dense,lexical])[:k]
+            pairs = [(i,dense_scores[i]) for i in selected]
+        else:
+            scores, ids = self.index.search(q,min(k,self.index.ntotal))
+            pairs = [(int(i),float(s)) for i,s in zip(ids[0],scores[0]) if i>=0]
         results = []
-        for idx, score in zip(ids[0], scores[0]):
-            if idx < 0: continue
-            record = self.records[int(idx)]
+        for idx, score in pairs:
+            record = self.records[idx]
             results.append(Evidence(
                 chunk_id=str(record["chunk_id"]), text=record["text"],
                 source_id=str(record.get("source_id","")), title=record.get("document_title",""),
-                url=record.get("source_url",""), score=float(score),
+                url=record.get("source_url",""), score=score,
                 metadata={k:v for k,v in record.items() if k!="text"},
             ))
         return results

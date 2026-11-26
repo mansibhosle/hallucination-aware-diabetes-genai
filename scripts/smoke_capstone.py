@@ -16,3 +16,6 @@ for q in ["What is prediabetes?", "What are the common symptoms of type 2 diabet
     if q.startswith(("How many units","Which stock")):
         assert r["decision"].startswith("ABSTAIN")
     print("Evidence IDs:",[e["chunk_id"] for e in r["evidence"]])
+    for i,e in enumerate(r["evidence"],1):
+        print(f"  {i}. {e['chunk_id']} | cosine={e['score']:.4f} | rerank={e['rerank_score']:.4f}")
+        print("     "+e["text"][:350].replace("\n"," "))

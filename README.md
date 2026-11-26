@@ -140,3 +140,8 @@ DB_PATH=outputs/capstone_smoke.sqlite
 ```
 
 Run `python scripts/smoke_capstone.py`. Startup checks all metadata IDs and texts against the original corpus, index dimensions and metric, and compares a sample of reconstructed vectors with newly encoded records. The GPU backend loads the base Phi-3 model in 4-bit NF4 and the supplied final SFT adapter. The original adapter, index and data must be supplied separately. The current lexical claim verifier and risk thresholds differ from the original capstone evaluation; these are heuristic checks, not clinically validated safety controls. GPU smoke tests and full evaluation must be run with the private artifacts; CI tests metadata validation without downloading models.
+
+
+### Experimental retrieval reliability upgrade
+
+For the next research smoke test, select `FAISS_SEARCH_MODE=hybrid`, `TOP_K_CANDIDATES=30`, `TOP_K_FINAL=5`, `RERANK_BACKEND=cross_encoder`, and `RERANK_DEVICE=cpu`. This combines dense and BM25 ranks using reciprocal rank fusion, conservatively excludes likely bibliography chunks, and reranks the candidate passages with a general-purpose cross-encoder. The evidence gate still uses dense cosine similarity, not raw cross-encoder logits. The model's generation budget defaults to 160 tokens; hitting the budget without an EOS token now produces an explicit abstention. These changes are experimental, not clinically validated, and must be evaluated on independent questions. Claim verification remains lexical and cannot detect all contradictions. Source dates and clinical relevance still require review.
