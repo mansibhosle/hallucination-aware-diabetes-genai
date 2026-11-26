@@ -150,3 +150,16 @@ For the next research smoke test, select `FAISS_SEARCH_MODE=hybrid`, `TOP_K_CAND
 ### Experimental NLI verification
 
 Set `VERIFICATION_BACKEND=nli` with the GPU research configuration. The default NLI model is cross-encoder/nli-deberta-v3-small on CPU. It compares each generated sentence (hypothesis) against each retrieved passage (premise) using entailment, contradiction and neutral labels. A sentence requires at least one entailment score >= 0.80 and no contradiction score >= 0.80. Any unsupported sentence causes ABSTAIN_NLI. Thresholds are uncalibrated starting points; sentence splitting is not atomic claim extraction, and the model is general-domain rather than clinically validated. NLI establishes estimated textual support, not truth, source currency, clinical appropriateness or completeness. Contradiction checks may cause false abstentions. Review source quality and test on independent data before deployment. Unit tests use synthetic scores and do not validate actual NLI model accuracy. Keep private artifacts and evaluation logs outside Git.
+
+
+### Experimental hierarchical retrieval
+
+Set `FAISS_SEARCH_MODE=hierarchical` to build an additional in-memory index of overlapping one- and two-sentence windows (long spans are split into bounded word windows). Child dense and BM25 rankings are deduplicated by original parent and fused; the cross-encoder ranks the best dense-matching child window. The full original parent passage is returned for generation and verification with source metadata and a matched-window diagnostic. No original FAISS artifacts are overwritten and no child vectors or medical documents are committed. Building the child index adds startup time and memory consumption.
+
+Example retrieval-only diagnostic (private artifacts must be configured):
+
+```bash
+python scripts/diagnose_retrieval.py --question "What is prediabetes?" --mode hierarchical --candidates 100
+```
+
+The evidence gate uses child-window cosine rather than parent cosine in this mode. Although the numeric threshold is unchanged, the score distribution is not comparable and requires fresh validation. This is an experimental retrieval option, not evidence of improved clinical accuracy. The existing semantic/hybrid modes remain available. The new unit tests validate window creation and parent deduplication, not actual medical retrieval quality.

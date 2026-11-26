@@ -43,11 +43,15 @@ class FaissRetriever:
         if self.encoder.get_sentence_embedding_dimension() != self.index.d:
             raise ValueError("Embedding dimensions do not match")
         self.verify_sample_mapping()
-        if search_mode not in {"semantic", "hybrid"}:
+        if search_mode not in {"semantic", "hybrid", "hierarchical"}:
             raise ValueError("Unknown FAISS search mode")
         self.search_mode=search_mode
         self.eligible=[not is_reference_chunk(r) for r in self.records] if search_mode=="hybrid" else [True]*len(self.records)
         self.bm25=BM25([r["text"] for r in self.records]) if search_mode=="hybrid" else None
+        self.child_search=None
+        if search_mode=="hierarchical":
+            from .hierarchical import HierarchicalSearch
+            self.child_search=HierarchicalSearch(self.records,self.encoder,self.index)
 
     def verify_sample_mapping(self, sample_size=5):
         import numpy as np
@@ -59,6 +63,8 @@ class FaissRetriever:
                 raise ValueError(f"Sample embedding mismatch at row {i}; check index ordering and build configuration")
 
     def search(self, query, k=20):
+        if self.child_search is not None:
+            return self.child_search.search(query,k)
         import numpy as np
         q = self.encoder.encode([query], normalize_embeddings=True, convert_to_numpy=True).astype("float32")
         if self.bm25 is not None:
