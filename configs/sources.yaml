@@ -1,0 +1,26 @@
+approved_sources:
+  - source_id: niddk
+    organization: NIDDK/NIH
+    allowed_domains: ["niddk.nih.gov"]
+    redistributable: true
+    status: approved
+  - source_id: cdc
+    organization: CDC
+    allowed_domains: ["cdc.gov"]
+    redistributable: true
+    status: approved
+  - source_id: ada_reference
+    organization: American Diabetes Association
+    allowed_domains: ["diabetesjournals.org", "diabetes.org"]
+    redistributable: false
+    status: reference_only
+  - source_id: who_reference
+    organization: World Health Organization
+    allowed_domains: ["who.int"]
+    redistributable: false
+    status: reference_only
+  - source_id: idf_reference
+    organization: International Diabetes Federation
+    allowed_domains: ["idf.org"]
+    redistributable: false
+    status: reference_only

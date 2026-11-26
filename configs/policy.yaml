@@ -1,0 +1,11 @@
+risk_thresholds:
+  general_education: 0.68
+  diagnosis_general: 0.74
+  pregnancy: 0.80
+  medication_general: 0.82
+blocked_intents:
+  - individualized_insulin_dose
+  - medication_change
+  - device_setting_change
+  - emergency
+  - out_of_domain
