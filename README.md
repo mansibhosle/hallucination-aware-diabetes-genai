@@ -196,3 +196,12 @@ mlflow ui --backend-store-uri sqlite:///outputs/mlflow.db --host 127.0.0.1 --por
 ```
 
 Keep all review files private. MLflow logs aggregate metrics and fingerprints, not raw evidence. Do not expose MLflow publicly. Freeze an explicit configuration before rerunning the historical test using --split test --configuration NAME --allow-original-test and a new output directory. This is not a new independent test; independent evaluation and clinician review remain necessary. Undefined rates are null.
+
+
+## Restricted portfolio demo
+
+The dedicated demo uses fixed scripted questions and a generated sample index. It does not load the private medical corpus or adapter, accept arbitrary questions, or expose API/monitoring endpoints. It requires a host-provided password and is labeled CPU sample mode. The container is non-root and its port is bound only to loopback.
+
+Set a unique strong DEMO_PASSWORD in your local environment (never commit it), then run `docker compose -f compose.demo.yml up --build` and open http://localhost:8501. Stop with `docker compose -f compose.demo.yml down`. Without Docker, use a fresh sample-only checkout with default CPU settings, run `python scripts/bootstrap_demo.py`, then `python -m streamlit run src/ui/secure_demo.py --server.address 127.0.0.1 --server.port 8501`.
+
+This is a restricted local deployment template, not a live cloud deployment or audited security boundary. For external hosting use HTTPS, host-level identity/access controls, rate limiting and managed secrets. Do not expose the unrestricted development API or MLflow. No real patient data or public clinical inference is supported.

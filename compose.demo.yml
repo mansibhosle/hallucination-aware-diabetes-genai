@@ -1,0 +1,15 @@
+services:
+  demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+    environment:
+      DEMO_PASSWORD: "${DEMO_PASSWORD:?Set a strong demo password}"
+    ports:
+      - "127.0.0.1:8501:8501"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
