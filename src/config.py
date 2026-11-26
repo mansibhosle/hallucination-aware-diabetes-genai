@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     faiss_search_mode: str = "semantic"
     rerank_device: str = "cpu"
     max_new_tokens: int = 160
+    verification_backend: str = "lexical"
+    nli_model: str = "cross-encoder/nli-deberta-v3-small"
+    nli_device: str = "cpu"
+    nli_entailment_threshold: float = 0.80
+    nli_contradiction_threshold: float = 0.80
     embedding_backend: str = "tfidf"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     rerank_backend: str = "heuristic"

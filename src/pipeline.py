@@ -12,8 +12,9 @@ from .confidence.scoring import score as confidence_score, threshold_for
 from .storage.sqlite import log_interaction
 
 class Platform:
-    def __init__(self,retriever,reranker,generator,settings=SETTINGS):
+    def __init__(self,retriever,reranker,generator,settings=SETTINGS,verifier=None):
         self.retriever=retriever; self.reranker=reranker; self.generator=generator; self.settings=settings
+        self.verifier=verifier or verify_claim_support
 
     @classmethod
     def load_default(cls):
@@ -31,7 +32,15 @@ class Platform:
             raise ValueError("Unknown embedding backend")
         rr=Reranker(SETTINGS.rerank_backend, SETTINGS.rerank_model, SETTINGS.rerank_device)
         g=GroundedGenerator(SETTINGS.generation_backend, SETTINGS.model_name, SETTINGS.model_adapter_path, SETTINGS.max_new_tokens)
-        return cls(r,rr,g)
+        if SETTINGS.verification_backend=="nli":
+            from .verification.nli import NLIVerifier
+            verifier=NLIVerifier(SETTINGS.nli_model,SETTINGS.nli_device,
+                SETTINGS.nli_entailment_threshold,SETTINGS.nli_contradiction_threshold)
+        elif SETTINGS.verification_backend=="lexical":
+            verifier=verify_claim_support
+        else:
+            raise ValueError("Unknown verification backend")
+        return cls(r,rr,g,verifier=verifier)
 
     def answer(self, question:str, user_role:str="patient") -> dict:
         trace_id=str(uuid4())
@@ -56,14 +65,18 @@ class Platform:
         if not answer.strip() or answer.strip().lower().startswith(("abstain", "insufficient evidence", "the evidence does not support", "the available evidence does not support", "i cannot", "i can't")):
             payload={"question":question,"decision":"ABSTAIN_MODEL_REFUSAL","answer":"The model did not provide a supported answer.","reason":"model_refusal_or_empty","confidence":0.0,"risk_class":policy.risk_class,"evidence":[e.model_dump() for e in evidence],"metrics":{"retrieval_quality":retrieval,"evidence_availability":availability},"trace_id":trace_id}
             log_interaction(self.settings.db_path,payload); return payload
-        verification=verify_claim_support(answer,evidence)
+        verification=self.verifier(answer,evidence)
         support=verification["support"]
         conf=confidence_score(retrieval,availability,support)
         threshold=threshold_for(policy.risk_class,self.settings.base_confidence_threshold)
-        if conf < threshold or verification["unsupported_claims"]:
+        details=verification.get("details",[])
+        if getattr(self.settings,"verification_backend","lexical")=="nli" and (not details or verification["unsupported_claims"]):
+            decision="ABSTAIN_NLI"; final="The retrieved passages do not adequately verify every sentence of the proposed response."
+            reason="nli_grounding_failed"
+        elif conf < threshold or verification["unsupported_claims"]:
             decision="ABSTAIN_CONFIDENCE"; final="The available evidence was not strong enough to support a reliable answer."
             reason="low_confidence_or_unsupported_claim"
         else:
             decision="ANSWER"; final=answer; reason=""
-        payload={"question":question,"decision":decision,"answer":final,"reason":reason,"confidence":conf,"risk_class":policy.risk_class,"evidence":[e.model_dump() for e in evidence],"metrics":{"retrieval_quality":retrieval,"evidence_availability":availability,"answer_evidence_support":support,"threshold":threshold},"trace_id":trace_id}
+        payload={"question":question,"decision":decision,"answer":final,"reason":reason,"confidence":conf,"risk_class":policy.risk_class,"evidence":[e.model_dump() for e in evidence],"metrics":{"retrieval_quality":retrieval,"evidence_availability":availability,"answer_evidence_support":support,"threshold":threshold,"verified_sentences":sum(d["status"]=="supported" for d in details),"contradicted_sentences":sum(d["status"]=="contradicted" for d in details),"insufficient_sentences":sum(d["status"]=="insufficient" for d in details)},"verification_details":details,"trace_id":trace_id}
         log_interaction(self.settings.db_path,payload); return payload

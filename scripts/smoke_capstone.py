@@ -19,3 +19,6 @@ for q in ["What is prediabetes?", "What are the common symptoms of type 2 diabet
     for i,e in enumerate(r["evidence"],1):
         print(f"  {i}. {e['chunk_id']} | cosine={e['score']:.4f} | rerank={e['rerank_score']:.4f}")
         print("     "+e["text"][:350].replace("\n"," "))
+
+    if r.get('verification_details'):
+        print('NLI sentence diagnostics:',json.dumps(r['verification_details'],indent=2))
