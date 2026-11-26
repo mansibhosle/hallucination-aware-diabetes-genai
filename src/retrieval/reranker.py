@@ -9,6 +9,8 @@ class Reranker:
 
     def rerank(self, question: str, evidence: list[Evidence], k: int=5) -> list[Evidence]:
         if not evidence: return []
+        if self.backend=="none":
+            return evidence[:k]
         if self.model is not None:
             scores=self.model.predict([(question,e.metadata.get("matched_window",e.text)) for e in evidence])
             for e,s in zip(evidence,scores): e.rerank_score=float(s)

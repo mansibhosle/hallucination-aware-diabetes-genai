@@ -176,3 +176,23 @@ python scripts/benchmark_retrieval.py --evaluation /private/path/evaluation_ques
 Compares original dense FAISS, hybrid RRF, hybrid with cross-encoder and hierarchical with cross-encoder. All use the same candidate budget and top-five evaluation cutoff. The original validation split is selected by name; the test split is not used. Questions labeled should_abstain are excluded from this retrieval relevance benchmark and reported in exclusions.json. Missing/unmapped reference source IDs cause a clear failure rather than silently biasing the comparison. Results are saved to ignored outputs/retrieval_benchmark (summary.csv, per_question.csv, exclusions.json, manifest.json). No Phi-3 or NLI inference is needed.
 
 Hit@1/5 and MRR@5 are based on matching reference source IDs at ranked passage positions; source recall counts distinct labeled sources retrieved. They are **source-level proxies**, not passage-level relevance or medical factual accuracy. Review top-five passages for actual clinical relevance before selecting a configuration. Mean and p95 retrieval latency include reranking where applicable; initialization is reported separately. A small validation set gives noisy estimates, and previously inspected examples are development cases. Use an independent held-out evaluation after fixing the configuration.
+
+
+## Final evaluation and MLflow
+
+Complete the validation retrieval benchmark first. Review retrieved passage relevance and latency. Run:
+
+```bash
+python scripts/evaluate_system.py --evaluation /private/path/evaluation_questions.csv --split validation --output-dir outputs/final_validation
+```
+
+The provisional selection uses source MRR@5, then Hit@5, then lowest mean latency; use --configuration to override based on reviewed evidence. Automatic metrics measure abstention and latency only. Copy review.csv to reviewed.csv and fill factual_correct, evidence_supported, safe_under_review_rubric with reviewed 0/1 for every ANSWER. Run:
+
+```bash
+python scripts/score_review.py --run-dir outputs/final_validation --review outputs/final_validation/reviewed.csv
+pip install -r requirements-mlops.txt
+python scripts/log_mlflow.py --run-dir outputs/final_validation
+mlflow ui --backend-store-uri sqlite:///outputs/mlflow.db --host 127.0.0.1 --port 5000
+```
+
+Keep all review files private. MLflow logs aggregate metrics and fingerprints, not raw evidence. Do not expose MLflow publicly. Freeze an explicit configuration before rerunning the historical test using --split test --configuration NAME --allow-original-test and a new output directory. This is not a new independent test; independent evaluation and clinician review remain necessary. Undefined rates are null.
