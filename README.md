@@ -163,3 +163,16 @@ python scripts/diagnose_retrieval.py --question "What is prediabetes?" --mode hi
 ```
 
 The evidence gate uses child-window cosine rather than parent cosine in this mode. Although the numeric threshold is unchanged, the score distribution is not comparable and requires fresh validation. This is an experimental retrieval option, not evidence of improved clinical accuracy. The existing semantic/hybrid modes remain available. The new unit tests validate window creation and parent deduplication, not actual medical retrieval quality.
+
+
+### Retrieval benchmark (validation only)
+
+With the private artifacts configured, run:
+
+```bash
+python scripts/benchmark_retrieval.py --evaluation /private/path/evaluation_questions.csv --candidates 100
+```
+
+Compares original dense FAISS, hybrid RRF, hybrid with cross-encoder and hierarchical with cross-encoder. All use the same candidate budget and top-five evaluation cutoff. The original validation split is selected by name; the test split is not used. Questions labeled should_abstain are excluded from this retrieval relevance benchmark and reported in exclusions.json. Missing/unmapped reference source IDs cause a clear failure rather than silently biasing the comparison. Results are saved to ignored outputs/retrieval_benchmark (summary.csv, per_question.csv, exclusions.json, manifest.json). No Phi-3 or NLI inference is needed.
+
+Hit@1/5 and MRR@5 are based on matching reference source IDs at ranked passage positions; source recall counts distinct labeled sources retrieved. They are **source-level proxies**, not passage-level relevance or medical factual accuracy. Review top-five passages for actual clinical relevance before selecting a configuration. Mean and p95 retrieval latency include reranking where applicable; initialization is reported separately. A small validation set gives noisy estimates, and previously inspected examples are development cases. Use an independent held-out evaluation after fixing the configuration.
